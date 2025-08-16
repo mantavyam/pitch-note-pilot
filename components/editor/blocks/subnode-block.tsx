@@ -5,10 +5,9 @@ import { SubNode } from "@/lib/types/document"
 import { useDocument } from "@/lib/stores/document-store"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent } from "@/components/ui/card"
-import { 
-  GripVerticalIcon, 
+
+
+import {
   MoreHorizontalIcon,
   TrashIcon,
   ImageIcon,
@@ -24,6 +23,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { RichTextEditor } from "@/components/ui/rich-text-editor"
+import { AdvancedTableEditor } from "@/components/ui/advanced-table-editor"
+// Removed sortable imports - individual subnodes should not be draggable
 // import { useSortable } from "@dnd-kit/sortable"
 // import { CSS } from "@dnd-kit/utilities"
 
@@ -88,43 +90,27 @@ function HeadlineContent({ content, onUpdate, isEditing, setIsEditing }: Content
   }
 
   return (
-    <h4 
+    <h4
       className="font-semibold cursor-pointer hover:text-primary"
-      onDoubleClick={() => setIsEditing(true)}
+      onClick={() => setIsEditing(true)}
     >
-      {content || "Double-click to add headline"}
+      {content || "Click to add headline"}
     </h4>
   )
 }
 
 function DescriptionContent({ content, onUpdate, isEditing, setIsEditing }: ContentProps) {
-  const [value, setValue] = useState(content)
-
-  const handleSave = () => {
-    onUpdate(value)
-    setIsEditing(false)
-  }
-
-  if (isEditing) {
-    return (
-      <Textarea
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={handleSave}
-        placeholder="Enter description..."
-        className="min-h-[100px]"
-        autoFocus
-      />
-    )
-  }
-
   return (
-    <p 
-      className="text-sm text-muted-foreground cursor-pointer hover:text-foreground whitespace-pre-wrap"
-      onDoubleClick={() => setIsEditing(true)}
-    >
-      {content || "Double-click to add description"}
-    </p>
+    <div onClick={() => !isEditing && setIsEditing(true)}>
+      <RichTextEditor
+        content={content}
+        onUpdate={onUpdate}
+        placeholder="Click to add description..."
+        isEditing={isEditing}
+        onEditingChange={setIsEditing}
+        className="min-h-[100px]"
+      />
+    </div>
   )
 }
 
@@ -134,6 +120,8 @@ interface ImageContentProps {
 }
 
 function ImageContent({ content, onUpdate }: ImageContentProps) {
+  const [isDragOver, setIsDragOver] = useState(false)
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -143,11 +131,47 @@ function ImageContent({ content, onUpdate }: ImageContentProps) {
     }
   }
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+
+    const files = Array.from(e.dataTransfer.files)
+    const imageFile = files.find(file => file.type.startsWith('image/'))
+
+    if (imageFile) {
+      // TODO: Implement actual file upload
+      const url = URL.createObjectURL(imageFile)
+      onUpdate({ url, alt: imageFile.name })
+    }
+  }
+
   if (!content?.url) {
     return (
-      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+      <div
+        className={cn(
+          "border-2 border-dashed rounded-lg p-8 text-center transition-colors",
+          isDragOver
+            ? "border-primary bg-primary/5"
+            : "border-muted-foreground/25"
+        )}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         <ImageIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground mb-4">Upload an image</p>
+        <p className="text-sm text-muted-foreground mb-4">
+          {isDragOver ? "Drop image here" : "Drag & drop an image or click to upload"}
+        </p>
         <label htmlFor="image-upload" className="cursor-pointer">
           <Button variant="outline" size="sm" asChild>
             <span>
@@ -184,52 +208,19 @@ function ImageContent({ content, onUpdate }: ImageContentProps) {
 interface TableContentProps {
   content?: { headers: string[]; rows: string[][] }
   onUpdate: (table: { headers: string[]; rows: string[][] }) => void
+  isEditing: boolean
+  setIsEditing: (editing: boolean) => void
 }
 
-function TableContent({ content, onUpdate }: TableContentProps) {
-  if (!content?.headers?.length) {
-    return (
-      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
-        <TableIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground mb-4">Create a table</p>
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => onUpdate({ 
-            headers: ['Column 1', 'Column 2'], 
-            rows: [['', '']] 
-          })}
-        >
-          Add Table
-        </Button>
-      </div>
-    )
-  }
-
+function TableContent({ content, onUpdate, isEditing, setIsEditing }: TableContentProps) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse border border-border">
-        <thead>
-          <tr>
-            {content.headers.map((header, index) => (
-              <th key={index} className="border border-border p-2 bg-muted font-medium text-left">
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {content.rows.map((row, rowIndex) => (
-            <tr key={rowIndex}>
-              {row.map((cell, cellIndex) => (
-                <td key={cellIndex} className="border border-border p-2">
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div onClick={() => !isEditing && setIsEditing(true)}>
+      <AdvancedTableEditor
+        content={content}
+        onUpdate={onUpdate}
+        isEditing={isEditing}
+        onEditingChange={setIsEditing}
+      />
     </div>
   )
 }
@@ -239,9 +230,32 @@ export function SubNodeBlock({ subnode, nodeId, documentId }: SubNodeBlockProps)
   const {
     updateSubNode,
     deleteSubNode,
+    addSubNode,
     editorState,
     setSelectedSubnode
   } = useDocument()
+
+  // Removed sortable functionality - individual subnodes should not be draggable
+  // const {
+  //   attributes,
+  //   listeners,
+  //   setNodeRef,
+  //   transform,
+  //   transition,
+  //   isDragging,
+  // } = useSortable({
+  //   id: subnode.id,
+  //   data: {
+  //     type: 'subnode',
+  //     subnode,
+  //     nodeId,
+  //   },
+  // })
+
+  // const style = {
+  //   transform: CSS.Transform.toString(transform),
+  //   transition,
+  // }
 
   // const {
   //   attributes,
@@ -281,6 +295,15 @@ export function SubNodeBlock({ subnode, nodeId, documentId }: SubNodeBlockProps)
     setSelectedSubnode(subnode.id)
   }
 
+  const handleInsertTable = () => {
+    addSubNode(documentId, nodeId, 'table', {
+      table: {
+        headers: ['Column 1', 'Column 2'],
+        rows: [['Row 1 Col 1', 'Row 1 Col 2']]
+      }
+    })
+  }
+
   const renderContent = () => {
     switch (subnode.type) {
       case 'headline':
@@ -316,6 +339,8 @@ export function SubNodeBlock({ subnode, nodeId, documentId }: SubNodeBlockProps)
           <TableContent
             content={subnode.content.table}
             onUpdate={(table) => handleContentUpdate({ table })}
+            isEditing={isEditing}
+            setIsEditing={setIsEditing}
           />
         )
       
@@ -325,26 +350,22 @@ export function SubNodeBlock({ subnode, nodeId, documentId }: SubNodeBlockProps)
   }
 
   return (
-    <Card
-      // ref={setNodeRef}
-      // style={style}
+    <div
       className={cn(
-        "transition-all duration-200 hover:shadow-sm border-l-4 border-l-muted group",
-        isSelected && "border-l-primary ring-1 ring-primary ring-offset-1"
-        // isDragging && "opacity-50"
+        "transition-all duration-200 hover:bg-blue-50 hover:border-l-blue-400 border-l-4 border-l-transparent group px-3 py-2",
+        isSelected && "border-l-blue-500 bg-blue-50 ring-1 ring-blue-200"
       )}
       onClick={handleSubNodeClick}
     >
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
-          {/* Drag Handle */}
-          <div
+        <div className="flex items-start gap-2">
+          {/* Drag Handle - Disabled for individual subnodes */}
+          {/* <div
             className="cursor-grab hover:cursor-grabbing text-muted-foreground mt-1"
-            // {...attributes}
-            // {...listeners}
+            {...attributes}
+            {...listeners}
           >
             <GripVerticalIcon className="h-4 w-4" />
-          </div>
+          </div> */}
 
           {/* Icon */}
           <div className="mt-1">
@@ -354,6 +375,21 @@ export function SubNodeBlock({ subnode, nodeId, documentId }: SubNodeBlockProps)
           {/* Content */}
           <div className="flex-1 min-w-0">
             {renderContent()}
+
+            {/* Table insertion button for description blocks */}
+            {subnode.type === 'description' && (
+              <div className="mt-2 pt-2 border-t border-dashed">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleInsertTable}
+                  className="flex items-center gap-1 text-xs"
+                >
+                  <TableIcon className="h-3 w-3" />
+                  Insert Table
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Actions */}
@@ -382,7 +418,6 @@ export function SubNodeBlock({ subnode, nodeId, documentId }: SubNodeBlockProps)
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </CardContent>
-    </Card>
+      </div>
   )
 }

@@ -37,7 +37,7 @@ const data = {
   user: {
     name: "mantavyam",
     email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
+    avatar: "public/noteglider-logo.png",
   },
   navMain: [
     {
@@ -57,7 +57,7 @@ const data = {
     },
     {
       title: "Projects",
-      url: "#",
+      url: "/projects",
       icon: IconFolder,
     },
     {

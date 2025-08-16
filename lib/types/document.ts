@@ -58,6 +58,7 @@ export interface EditorState {
   selectedNodeId: string | null
   selectedSubnodeId: string | null
   isOutlineCollapsed: boolean
+  hasUnsavedChanges: boolean
   draggedItem: {
     type: 'node' | 'subnode'
     id: string
