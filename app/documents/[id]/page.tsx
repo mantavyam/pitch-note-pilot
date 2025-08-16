@@ -35,7 +35,7 @@ export default function DocumentPage() {
             Document not found
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            The document you're looking for doesn't exist or has been deleted.
+            The document you&apos;re looking for doesn&apos;t exist or has been deleted.
           </p>
         </div>
       </div>

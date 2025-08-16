@@ -3,10 +3,12 @@
 import { Document } from "@/lib/types/document"
 import { NodeBlock } from "../blocks/node-block"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Button } from "@/components/ui/button"
-import { PlusIcon } from "lucide-react"
+
 import { useDocument } from "@/lib/stores/document-store"
-// import { DragDropProvider } from "../drag-drop/drag-drop-provider"
+import { DragDropProvider } from "../drag-drop/drag-drop-provider"
+import { CircularAddButton } from "@/components/ui/circular-add-button"
+import { EditorMinimap } from "@/components/ui/editor-minimap"
+import { useRef } from "react"
 
 interface WriteUpViewProps {
   document: Document
@@ -14,18 +16,20 @@ interface WriteUpViewProps {
 
 export function WriteUpView({ document }: WriteUpViewProps) {
   const { addNode } = useDocument()
+  const contentRef = useRef<HTMLDivElement>(null)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
 
   const handleAddNode = () => {
-    addNode(document.id, "New Category")
+    addNode(document.id, "NEWS-CATEGORY", undefined, true)
   }
 
   return (
-    // <DragDropProvider document={document}>
-      <ScrollArea className="h-full">
-        <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <DragDropProvider document={document}>
+      <ScrollArea className="h-full" ref={scrollAreaRef}>
+        <div ref={contentRef} className="max-w-4xl mx-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
           {/* Document Header */}
-          <div className="text-center py-8 border-b">
-            <h1 className="text-3xl font-bold mb-2">{document.title}</h1>
+          <div className="text-center py-4 sm:py-6 border-b">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-2">{document.title}</h1>
             {document.youtubeUrl && (
               <a
                 href={document.youtubeUrl}
@@ -39,7 +43,7 @@ export function WriteUpView({ document }: WriteUpViewProps) {
           </div>
 
           {/* Node Blocks */}
-          <div className="space-y-8">
+          <div className="space-y-6 sm:space-y-8">
             {document.nodes
               .sort((a, b) => a.order - b.order)
               .map((node, index) => (
@@ -53,16 +57,12 @@ export function WriteUpView({ document }: WriteUpViewProps) {
           </div>
 
         {/* Add Node Button */}
-        <div className="flex justify-center py-8">
-          <Button
+        <div className="flex justify-center py-4">
+          <CircularAddButton
             onClick={handleAddNode}
-            variant="outline"
+            tooltip="Add News Category"
             size="lg"
-            className="flex items-center gap-2"
-          >
-            <PlusIcon className="h-5 w-5" />
-            Add New Category
-          </Button>
+          />
         </div>
 
         {/* Empty State */}
@@ -73,18 +73,21 @@ export function WriteUpView({ document }: WriteUpViewProps) {
             <p className="text-muted-foreground mb-6">
               Add categories and organize your content with our intuitive block-based editor.
             </p>
-            <Button
+            <CircularAddButton
               onClick={handleAddNode}
+              tooltip="Add Your First Category"
               size="lg"
-              className="flex items-center gap-2"
-            >
-              <PlusIcon className="h-5 w-5" />
-              Add Your First Category
-            </Button>
+            />
           </div>
         )}
         </div>
       </ScrollArea>
-    // </DragDropProvider>
+
+      {/* Minimap */}
+      <EditorMinimap
+        contentRef={contentRef}
+        scrollAreaRef={scrollAreaRef}
+      />
+    </DragDropProvider>
   )
 }

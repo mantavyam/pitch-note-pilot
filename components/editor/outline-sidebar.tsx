@@ -63,10 +63,7 @@ function OutlineSubNode({ subnode, nodeId, documentId, isSelected, onSelect }: O
     >
       <Icon className="h-3 w-3 flex-shrink-0" />
       <span className="truncate">
-        {subnode.content.headline || 
-         (subnode.type === 'description' ? 'Description' : 
-          subnode.type === 'image' ? 'Image' : 
-          subnode.type === 'table' ? 'Table' : 'Item')}
+        {subnode.content.headline || 'Untitled Headline'}
       </span>
     </div>
   )
@@ -119,9 +116,10 @@ function OutlineNode({ node, documentId, isSelected, onSelect }: OutlineNodeProp
         </Button>
       </div>
 
-      {isExpanded && node.subnodes.length > 0 && (
+      {isExpanded && (
         <div className="space-y-0.5">
           {node.subnodes
+            .filter(subnode => subnode.type === 'headline') // Only show headlines
             .sort((a, b) => a.order - b.order)
             .map((subnode) => (
               <OutlineSubNode
@@ -143,7 +141,7 @@ export function OutlineSidebar({ document }: OutlineSidebarProps) {
   const { editorState, setSelectedNode, addNode } = useDocument()
 
   const handleAddNode = () => {
-    addNode(document.id, "New Category")
+    addNode(document.id, "NEWS-CATEGORY", undefined, true)
   }
 
   return (

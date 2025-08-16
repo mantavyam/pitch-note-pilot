@@ -1,15 +1,14 @@
 "use client"
 
-import { 
-  PlusIcon, 
-  EyeIcon, 
-  DownloadIcon, 
+import {
+  EyeIcon,
+  DownloadIcon,
   ShareIcon,
   PanelLeftIcon,
-  LayoutGridIcon,
-  FileTextIcon,
-  LanguagesIcon
+  ArrowLeftIcon,
+  SaveIcon
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { Document } from "@/lib/types/document"
 import { useDocument } from "@/lib/stores/document-store"
 import { Button } from "@/components/ui/button"
@@ -21,22 +20,36 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+// Removed unused toggle group imports
 
 interface EditorToolbarProps {
   document: Document
 }
 
 export function EditorToolbar({ document }: EditorToolbarProps) {
-  const { 
-    editorState, 
-    setViewMode, 
+  const router = useRouter()
+  const {
+    editorState,
     toggleOutline,
-    addNode 
+    setUnsavedChanges
   } = useDocument()
 
-  const handleAddNode = () => {
-    addNode(document.id, "New Category")
+  const handleBack = () => {
+    if (editorState.hasUnsavedChanges) {
+      // TODO: Show save confirmation modal
+      if (confirm("You have unsaved changes. Are you sure you want to leave?")) {
+        setUnsavedChanges(false)
+        router.push("/dashboard")
+      }
+    } else {
+      router.push("/dashboard")
+    }
+  }
+
+  const handleSave = () => {
+    // TODO: Implement actual save functionality
+    console.log("Saving document:", document.id)
+    setUnsavedChanges(false)
   }
 
   const handleExport = (format: string) => {
@@ -52,20 +65,32 @@ export function EditorToolbar({ document }: EditorToolbarProps) {
   return (
     <div className="border-b bg-background px-4 py-2">
       <div className="flex items-center justify-between">
-        {/* Left side - Document info and navigation */}
+        {/* Left side - Navigation and outline toggle */}
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             size="sm"
             onClick={toggleOutline}
-            className="flex items-center gap-2"
+            className="h-8 w-8 p-0"
+            title={editorState.isOutlineCollapsed ? "Show Outline" : "Hide Outline"}
           >
             <PanelLeftIcon className="h-4 w-4" />
-            {editorState.isOutlineCollapsed ? "Show" : "Hide"} Outline
           </Button>
-          
+
           <Separator orientation="vertical" className="h-6" />
-          
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBack}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">Back</span>
+          </Button>
+
+          <Separator orientation="vertical" className="h-6" />
+
           <div className="flex flex-col">
             <h1 className="text-lg font-semibold">{document.title}</h1>
             <p className="text-sm text-muted-foreground">
@@ -74,44 +99,11 @@ export function EditorToolbar({ document }: EditorToolbarProps) {
           </div>
         </div>
 
-        {/* Center - View mode toggle */}
-        <ToggleGroup 
-          type="single" 
-          value={editorState.viewMode}
-          onValueChange={(value) => value && setViewMode(value as any)}
-          className="border rounded-md"
-        >
-          <ToggleGroupItem value="writeup" aria-label="WriteUp view">
-            <FileTextIcon className="h-4 w-4 mr-2" />
-            WriteUp
-          </ToggleGroupItem>
-          <ToggleGroupItem value="mindmap" aria-label="MindMap view">
-            <LayoutGridIcon className="h-4 w-4 mr-2" />
-            MindMap
-          </ToggleGroupItem>
-        </ToggleGroup>
+        {/* Center - Empty space */}
+        <div className="flex-1"></div>
 
         {/* Right side - Actions */}
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleAddNode}
-            className="flex items-center gap-2"
-          >
-            <PlusIcon className="h-4 w-4" />
-            Add Category
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <LanguagesIcon className="h-4 w-4" />
-            Translate
-          </Button>
-
           <Button
             variant="outline"
             size="sm"
@@ -151,6 +143,18 @@ export function EditorToolbar({ document }: EditorToolbarProps) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <Button
+            variant={editorState.hasUnsavedChanges ? "default" : "outline"}
+            size="sm"
+            onClick={handleSave}
+            className="flex items-center gap-2"
+          >
+            <SaveIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">
+              {editorState.hasUnsavedChanges ? "Save*" : "Save"}
+            </span>
+          </Button>
         </div>
       </div>
     </div>

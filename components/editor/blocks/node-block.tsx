@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import {
-  PlusIcon,
   GripVerticalIcon,
   MoreHorizontalIcon,
   TrashIcon,
@@ -22,8 +21,11 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { SubNodeBlock } from "./subnode-block"
 import { cn } from "@/lib/utils"
-// import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
-// import { CSS } from "@dnd-kit/utilities"
+import { useSortable } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { CircularAddButton } from "@/components/ui/circular-add-button"
+
+
 
 interface NodeBlockProps {
   node: Node
@@ -44,25 +46,25 @@ export function NodeBlock({ node, documentId, index }: NodeBlockProps) {
     setSelectedNode
   } = useDocument()
 
-  // const {
-  //   attributes,
-  //   listeners,
-  //   setNodeRef,
-  //   transform,
-  //   transition,
-  //   isDragging,
-  // } = useSortable({
-  //   id: node.id,
-  //   data: {
-  //     type: 'node',
-  //     node,
-  //   },
-  // })
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: node.id,
+    data: {
+      type: 'node',
+      node,
+    },
+  })
 
-  // const style = {
-  //   transform: CSS.Transform.toString(transform),
-  //   transition,
-  // }
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
 
   const isSelected = editorState.selectedNodeId === node.id
 
@@ -90,6 +92,29 @@ export function NodeBlock({ node, documentId, index }: NodeBlockProps) {
     addSubNode(documentId, node.id, type)
   }
 
+  const handleAddNewsItem = () => {
+    // Add a complete News Item with headline, image, and description
+
+    // Add headline
+    addSubNode(documentId, node.id, 'headline', {
+      headline: 'News Item Headline'
+    })
+
+    // Add image placeholder
+    addSubNode(documentId, node.id, 'image', {
+      image: {
+        url: '',
+        alt: 'News item image',
+        caption: 'Image caption'
+      }
+    })
+
+    // Add description
+    addSubNode(documentId, node.id, 'description', {
+      description: 'News item description...'
+    })
+  }
+
   const handleToggleCollapse = () => {
     const newCollapsed = !isCollapsed
     setIsCollapsed(newCollapsed)
@@ -102,22 +127,24 @@ export function NodeBlock({ node, documentId, index }: NodeBlockProps) {
 
   return (
     <Card
-      // ref={setNodeRef}
-      // style={style}
+      ref={setNodeRef}
+      style={style}
+      data-node-block
+      data-collapsed={isCollapsed}
       className={cn(
-        "transition-all duration-200 hover:shadow-md",
-        isSelected && "ring-2 ring-primary ring-offset-2"
-        // isDragging && "opacity-50"
+        "transition-all duration-200 hover:shadow-md hover:ring-2 hover:ring-blue-200 hover:border-blue-300",
+        isSelected && "ring-2 ring-blue-500 ring-offset-2 border-blue-500",
+        isDragging && "opacity-50"
       )}
       onClick={handleNodeClick}
     >
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-2 px-4 py-3">
         <div className="flex items-center gap-3">
           {/* Drag Handle */}
           <div
             className="cursor-grab hover:cursor-grabbing text-muted-foreground"
-            // {...attributes}
-            // {...listeners}
+            {...attributes}
+            {...listeners}
           >
             <GripVerticalIcon className="h-4 w-4" />
           </div>
@@ -152,9 +179,9 @@ export function NodeBlock({ node, documentId, index }: NodeBlockProps) {
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
-              <h3 
+              <h3
                 className="text-lg font-semibold cursor-pointer hover:text-primary"
-                onDoubleClick={(e) => {
+                onClick={(e) => {
                   e.stopPropagation()
                   setIsEditing(true)
                 }}
@@ -168,14 +195,12 @@ export function NodeBlock({ node, documentId, index }: NodeBlockProps) {
           <div className="flex items-center gap-1">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
+                <CircularAddButton
+                  onClick={() => {}}
+                  tooltip="Add Content"
                   size="sm"
-                  className="h-6 w-6 p-0"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <PlusIcon className="h-4 w-4" />
-                </Button>
+                  className="h-6 w-6"
+                />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => handleAddSubNode('headline')}>
@@ -222,47 +247,52 @@ export function NodeBlock({ node, documentId, index }: NodeBlockProps) {
       </CardHeader>
 
       {!isCollapsed && (
-        <CardContent className="pt-0">
-          {/* SubNodes */}
-          {/* <SortableContext
-            items={node.subnodes.map(subnode => subnode.id)}
-            strategy={verticalListSortingStrategy}
-          > */}
-            <div className="space-y-4">
-              {node.subnodes
-                .sort((a, b) => a.order - b.order)
-                .map((subnode) => (
+        <CardContent className="pt-0 px-4 pb-3">
+          {/* SubNodes - Unified Container */}
+          <div className="bg-background border border-border rounded-lg overflow-hidden hover:border-blue-300 transition-colors duration-200">
+            {node.subnodes
+              .sort((a, b) => a.order - b.order)
+              .map((subnode, index) => (
+                <div key={subnode.id}>
                   <SubNodeBlock
-                    key={subnode.id}
                     subnode={subnode}
                     nodeId={node.id}
                     documentId={documentId}
                   />
-                ))}
+                  {/* Separator line between subnodes */}
+                  {index < node.subnodes.length - 1 && (
+                    <div className="border-b border-border/30" />
+                  )}
+                </div>
+              ))}
+          </div>
+
+          {/* Add News Item Button */}
+          <div className="mt-4 pt-4 border-t border-solid">
+            <div className="flex justify-center">
+              <CircularAddButton
+                onClick={handleAddNewsItem}
+                tooltip="Add News Item"
+                size="md"
+              />
             </div>
-          {/* </SortableContext> */}
+          </div>
 
           {/* Add SubNode Button */}
           {node.subnodes.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               <p className="text-sm mb-4">No content yet. Add your first item:</p>
-              <div className="flex justify-center gap-2 flex-wrap">
-                <Button
-                  variant="outline"
-                  size="sm"
+              <div className="flex justify-center gap-3 flex-wrap">
+                <CircularAddButton
                   onClick={() => handleAddSubNode('headline')}
-                >
-                  <PlusIcon className="h-3 w-3 mr-1" />
-                  Headline
-                </Button>
-                <Button
-                  variant="outline"
+                  tooltip="Add Headline"
                   size="sm"
+                />
+                <CircularAddButton
                   onClick={() => handleAddSubNode('description')}
-                >
-                  <PlusIcon className="h-3 w-3 mr-1" />
-                  Description
-                </Button>
+                  tooltip="Add Description"
+                  size="sm"
+                />
               </div>
             </div>
           )}

@@ -12,13 +12,13 @@ interface DocumentContextType extends DocumentStore {
   setCurrentDocument: (document: Document | null) => void
   
   // Node actions
-  addNode: (documentId: string, title: string, afterNodeId?: string) => Node
+  addNode: (documentId: string, title: string, afterNodeId?: string, withStarterTemplate?: boolean) => Node
   updateNode: (documentId: string, nodeId: string, updates: Partial<Node>) => void
   deleteNode: (documentId: string, nodeId: string) => void
   reorderNodes: (documentId: string, nodeIds: string[]) => void
   
   // SubNode actions
-  addSubNode: (documentId: string, nodeId: string, type: SubNode['type'], afterSubnodeId?: string) => SubNode
+  addSubNode: (documentId: string, nodeId: string, type: SubNode['type'], initialContent?: SubNode['content'], afterSubnodeId?: string) => SubNode
   updateSubNode: (documentId: string, nodeId: string, subnodeId: string, updates: Partial<SubNode>) => void
   deleteSubNode: (documentId: string, nodeId: string, subnodeId: string) => void
   reorderSubNodes: (documentId: string, nodeId: string, subnodeIds: string[]) => void
@@ -29,6 +29,7 @@ interface DocumentContextType extends DocumentStore {
   setSelectedNode: (nodeId: string | null) => void
   setSelectedSubnode: (subnodeId: string | null) => void
   toggleOutline: () => void
+  setUnsavedChanges: (hasChanges: boolean) => void
 }
 
 type DocumentAction = 
@@ -48,6 +49,7 @@ type DocumentAction =
   | { type: 'SET_SELECTED_NODE'; payload: string | null }
   | { type: 'SET_SELECTED_SUBNODE'; payload: string | null }
   | { type: 'TOGGLE_OUTLINE' }
+  | { type: 'SET_UNSAVED_CHANGES'; payload: boolean }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
 
@@ -61,6 +63,7 @@ const initialState: DocumentStore & { editorState: EditorState } = {
     selectedNodeId: null,
     selectedSubnodeId: null,
     isOutlineCollapsed: false,
+    hasUnsavedChanges: false,
     draggedItem: null
   }
 }
@@ -121,6 +124,8 @@ function documentReducer(
             nodes.push(newNode)
           }
 
+          const totalSubnodes = nodes.reduce((total, node) => total + node.subnodes.length, 0)
+
           return {
             ...doc,
             nodes,
@@ -128,18 +133,42 @@ function documentReducer(
             metadata: {
               ...doc.metadata,
               totalNodes: nodes.length,
+              totalSubnodes,
               lastEditedNode: newNode.id
             }
           }
         }),
+        editorState: {
+          ...state.editorState,
+          hasUnsavedChanges: true
+        },
         currentDocument: state.currentDocument?.id === action.payload.documentId
-          ? {
-              ...state.currentDocument,
-              nodes: state.currentDocument.nodes.map(n => n.id === action.payload.node.id ? action.payload.node : n).concat(
-                state.currentDocument.nodes.find(n => n.id === action.payload.node.id) ? [] : [action.payload.node]
-              ),
-              updatedAt: new Date()
-            }
+          ? (() => {
+              const updatedNodes = [...state.currentDocument.nodes]
+              const newNode = { ...action.payload.node, order: updatedNodes.length }
+
+              if (action.payload.afterNodeId) {
+                const afterIndex = updatedNodes.findIndex(n => n.id === action.payload.afterNodeId)
+                updatedNodes.splice(afterIndex + 1, 0, newNode)
+                updatedNodes.forEach((node, index) => node.order = index)
+              } else {
+                updatedNodes.push(newNode)
+              }
+
+              const totalSubnodes = updatedNodes.reduce((total, node) => total + node.subnodes.length, 0)
+
+              return {
+                ...state.currentDocument,
+                nodes: updatedNodes,
+                updatedAt: new Date(),
+                metadata: {
+                  ...state.currentDocument.metadata,
+                  totalNodes: updatedNodes.length,
+                  totalSubnodes,
+                  lastEditedNode: newNode.id
+                }
+              }
+            })()
           : state.currentDocument
       }
 
@@ -439,7 +468,16 @@ function documentReducer(
           isOutlineCollapsed: !state.editorState.isOutlineCollapsed
         }
       }
-    
+
+    case 'SET_UNSAVED_CHANGES':
+      return {
+        ...state,
+        editorState: {
+          ...state.editorState,
+          hasUnsavedChanges: action.payload
+        }
+      }
+
     case 'SET_LOADING':
       return {
         ...state,
@@ -477,14 +515,26 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
             {
               id: uuidv4(),
               type: 'headline',
-              content: { headline: 'Replacement Headline' },
+              content: { headline: 'News Item Headline' },
               order: 0
             },
             {
               id: uuidv4(),
-              type: 'description',
-              content: { description: 'Replacement Description' },
+              type: 'image',
+              content: {
+                image: {
+                  url: '',
+                  alt: 'News item image',
+                  caption: 'Image caption'
+                }
+              },
               order: 1
+            },
+            {
+              id: uuidv4(),
+              type: 'description',
+              content: { description: 'News item description...' },
+              order: 2
             }
           ]
         }
@@ -493,7 +543,7 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
       updatedAt: new Date(),
       metadata: {
         totalNodes: 1,
-        totalSubnodes: 2
+        totalSubnodes: 3
       }
     }
     
@@ -513,14 +563,39 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'SET_CURRENT_DOCUMENT', payload: document })
   }, [])
   
-  const addNode = useCallback((documentId: string, title: string, afterNodeId?: string): Node => {
+  const addNode = useCallback((documentId: string, title: string, afterNodeId?: string, withStarterTemplate: boolean = true): Node => {
     const node: Node = {
       id: uuidv4(),
       title,
       order: 0, // Will be recalculated
-      subnodes: []
+      subnodes: withStarterTemplate ? [
+        {
+          id: uuidv4(),
+          type: 'headline',
+          content: { headline: 'News Item Headline' },
+          order: 0
+        },
+        {
+          id: uuidv4(),
+          type: 'image',
+          content: {
+            image: {
+              url: '',
+              alt: 'News item image',
+              caption: 'Image caption'
+            }
+          },
+          order: 1
+        },
+        {
+          id: uuidv4(),
+          type: 'description',
+          content: { description: 'News item description...' },
+          order: 2
+        }
+      ] : []
     }
-    
+
     dispatch({ type: 'ADD_NODE', payload: { documentId, node, afterNodeId } })
     return node
   }, [])
@@ -537,14 +612,14 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'REORDER_NODES', payload: { documentId, nodeIds } })
   }, [])
   
-  const addSubNode = useCallback((documentId: string, nodeId: string, type: SubNode['type'], afterSubnodeId?: string): SubNode => {
+  const addSubNode = useCallback((documentId: string, nodeId: string, type: SubNode['type'], initialContent?: SubNode['content'], afterSubnodeId?: string): SubNode => {
     const subnode: SubNode = {
       id: uuidv4(),
       type,
-      content: {},
+      content: initialContent || {},
       order: 0 // Will be recalculated
     }
-    
+
     dispatch({ type: 'ADD_SUBNODE', payload: { documentId, nodeId, subnode, afterSubnodeId } })
     return subnode
   }, [])
@@ -576,6 +651,10 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
   const toggleOutline = useCallback(() => {
     dispatch({ type: 'TOGGLE_OUTLINE' })
   }, [])
+
+  const setUnsavedChanges = useCallback((hasChanges: boolean) => {
+    dispatch({ type: 'SET_UNSAVED_CHANGES', payload: hasChanges })
+  }, [])
   
   const value: DocumentContextType = {
     ...state,
@@ -594,7 +673,8 @@ export function DocumentProvider({ children }: { children: React.ReactNode }) {
     setViewMode,
     setSelectedNode,
     setSelectedSubnode,
-    toggleOutline
+    toggleOutline,
+    setUnsavedChanges
   }
   
   return (
